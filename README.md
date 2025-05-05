@@ -1,4 +1,4 @@
-# Solar-Powered Bugle Call System
+# Solar-Powered Audio Player System
 
 ## Project Overview
 
