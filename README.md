@@ -48,7 +48,7 @@ a small solar power setup, making it ideal for outdoor use.
     git clone <repository_url>
     cd <repository_directory>
     ```
-    Alternatively, users can manually copy the Python script (`bugle-call.py`) and the `schedule.yaml` file to a directory on the Raspberry Pi.
+    Alternatively, users can manually copy the Python script (`audio-player.py`) and the `schedule.yaml` file to a directory on the Raspberry Pi.
 6.  **Create `schedule.yaml`:** Create a file named `schedule.yaml` in the same directory as your Python script with the 
       following structure (adjust paths and times as needed):
     ```yaml
@@ -87,4 +87,4 @@ a small solar power setup, making it ideal for outdoor use.
 To start the bugle call scheduler, navigate to the directory containing the Python script and run:
 
 ```bash
-python3 bugle-call.py schedule
+python3 audio-player.py schedule
