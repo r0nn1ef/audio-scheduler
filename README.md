@@ -3,10 +3,10 @@
 ## Project Overview
 
 This project is designed to create a solar-powered, automated bugle call system using a Raspberry Pi Zero. It plays 
-various US Army bugle calls (like Reveille, Retreat, Tattoo, and Taps) at scheduled times based on the day of the week 
-(weekdays and weekends). The schedule and audio file paths are configured using a YAML file, making it easy to customize 
-without modifying the Python code. The system is intended to run headless and be powered by a small solar power setup, 
-making it ideal for outdoor use.
+various US Army bugle calls (like Reveille, Retreat, Tattoo, and Taps or any other MP3 files) at scheduled times based 
+on the day of the week (weekdays and weekends). The schedule and audio file paths are configured using a YAML file, 
+making it easy to customize without modifying the Python code. The system is intended to run headless and be powered by 
+a small solar power setup, making it ideal for outdoor use.
 
 ## Features
 
