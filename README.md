@@ -10,7 +10,7 @@ a small solar power setup, making it ideal for outdoor use.
 
 ## Features
 
-* **Scheduled Playback:** Plays bugle call MP3 files at times defined in a YAML configuration file.
+* **Scheduled Playback:** Plays MP3 files at times defined in a YAML configuration file.
 * **Weekday/Weekend Schedules:** Supports different schedules for weekdays (Monday-Friday) and weekends (Saturday-Sunday).
 * **Command-Line Testing:** Includes an option to play specific MP3 files directly from the command line for testing purposes.
 * **Headless Operation:** Designed to run on a Raspberry Pi Zero without a monitor.
@@ -22,7 +22,7 @@ a small solar power setup, making it ideal for outdoor use.
 * **Raspberry Pi Zero 2 W:** The central processing unit for the system.
 * **Raspberry Pi OS Lite:** A lightweight operating system for the Raspberry Pi (recommended for headless operation).
 * **Audio Output:** A way for the Raspberry Pi to play audio (e.g., a HAT with speakers or connection to external speakers).
-* **MP3 Audio Files:** You will need MP3 files for the bugle calls you want to schedule.
+* **MP3 Audio Files:** You will need MP3 files audio that you want to schedule.
 * **Solar Power Components (Optional):** Solar panel, charge controller, and battery for автономное operation.
 * **Python 3:** Must be installed on the Raspberry Pi.
 * **Required Python Packages:**
@@ -77,14 +77,14 @@ a small solar power setup, making it ideal for outdoor use.
         time: "23:30"
         audio_file: "/path/to/your/file/taps.mp3"
     ```
-    **Note:** Replace `/path/to/your/file/audio.mp3` with the actual paths to your bugle call MP3 files. You may need to 
+    **Note:** Replace `/path/to/your/file/audio.mp3` with the actual paths to your MP3 files. You may need to 
     create separate directories (e.g., `weekdays`, `weekends`) to organize your audio files.
 
 ## Usage
 
 ### Running the Scheduler
 
-To start the bugle call scheduler, navigate to the directory containing the Python script and run:
+To start the audio player scheduler, navigate to the directory containing the Python script and run:
 
 ```bash
 python3 audio-player.py schedule
