@@ -13,7 +13,7 @@ logging.basicConfig(filename=LOG_FILE, level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
 # --- Configuration ---
-YAML_FILE = 'schedule.yaml'
+YAML_FILE = 'schedule.yml'
 TIMEZONE = pytz.timezone('America/Chicago')
 
 # --- Initialize Pygame Mixer ---
@@ -46,7 +46,7 @@ def load_schedule():
         return {}, {}
 
 # --- Schedule Jobs Based on Day of the Week ---
-def schedule_bugle_calls():
+def schedule_audio():
     weekday_schedule, weekend_schedule = load_schedule()
     now = datetime.now(TIMEZONE)
     day_of_week = now.weekday()  # Monday is 0, Sunday is 6
@@ -91,7 +91,7 @@ def main():
     if args.command == 'play':
         play_audio(args.filepath, 'Manual Playback', args.volume)
     elif args.command == 'schedule':
-        schedule_bugle_calls()
+        schedule_audio()
         while True:
             schedule.run_pending()
             time.sleep(1)
