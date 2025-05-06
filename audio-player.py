@@ -8,7 +8,7 @@ import yaml
 import argparse
 
 # --- Logging Configuration ---
-LOG_FILE = '/var/log/bugle_scheduler.log'
+LOG_FILE = '/var/log/audio_player.log'
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
