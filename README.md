@@ -15,7 +15,7 @@ a small solar power setup, making it ideal for outdoor use.
 * **Command-Line Testing:** Includes an option to play specific MP3 files directly from the command line for testing purposes.
 * **Headless Operation:** Designed to run on a Raspberry Pi Zero without a monitor.
 * **Solar Power Ready:** Intended to be powered by a small solar power system (components not included in this software setup).
-* **Configurable via YAML:** Schedule times and audio file paths are easily managed in a separate `schedule.yml` file.
+* **Configurable via YAML:** Schedule times and audio file paths are easily managed in a separate `config.yml` file.
 
 ## Prerequisites
 
@@ -48,10 +48,12 @@ a small solar power setup, making it ideal for outdoor use.
     git clone <repository_url>
     cd <repository_directory>
     ```
-    Alternatively, users can manually copy the Python script (`audio-player.py`) and the `schedule.yml` file to a directory on the Raspberry Pi.
-6.  **Create `schedule.yml`:** Create a file named `schedule.yml` in the same directory as your Python script with the 
+    Alternatively, users can manually copy the Python script (`audio-player.py`) and the `config.yml` file to a directory on the Raspberry Pi.
+6.  **Create `config.yml`:** Create a file named `config.yml` in the same directory as your Python script with the 
       following structure (adjust paths and times as needed):
     ```yaml
+    timezone: "America/Chicago" # Change this to suit your environment.
+    log_file: "/var/log/audio-player.log" # Change this to suit your environment.
     weekdays:
       reveille:
         time: "06:00"

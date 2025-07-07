@@ -9,13 +9,28 @@ import argparse
 import os
 import json
 
-LOG_FILE = '/var/log/audio_player.log'
-logging.basicConfig(filename=LOG_FILE, level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
-
-YAML_FILE = 'schedule.yml'
-TIMEZONE = pytz.timezone('America/Chicago')
+CONFIG_FILE = 'config.yml'
 STATE_FILE = 'play_state.json'
+CONFIG = {}
+TIMEZONE = None
+
+def load_config():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(script_dir, CONFIG_FILE)
+    try:
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+            return config
+    except FileNotFoundError:
+        print(f"Config file '{config_path}' not found.")
+        raise
+    except yaml.YAMLError as e:
+        print(f"Error parsing config file '{config_path}': {e}")
+        raise
+
+def setup_logging(log_file):
+    logging.basicConfig(filename=log_file, level=logging.INFO,
+                        format='%(asctime)s - %(levelname)s - %(message)s')
 
 def load_state():
     if os.path.exists(STATE_FILE):
@@ -65,22 +80,7 @@ def play_audio(filepath, call_name, volume=1.0):
             state['played_calls'].remove(call_name)
             save_state(state)
 
-def load_schedule():
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    yaml_path = os.path.join(script_dir, YAML_FILE)
-    try:
-        with open(yaml_path, 'r') as f:
-            schedule_data = yaml.safe_load(f)
-            return schedule_data.get('weekdays', {}), schedule_data.get('weekends', {})
-    except FileNotFoundError:
-        logging.error(f"YAML configuration file '{yaml_path}' not found.")
-        return {}, {}
-    except yaml.YAMLError as e:
-        logging.error(f"Error parsing YAML file '{yaml_path}': {e}")
-        return {}, {}
-
-def schedule_audio_jobs(initial_startup=False):
-    weekday_schedule, weekend_schedule = load_schedule()
+def schedule_audio_jobs(weekday_schedule, weekend_schedule, initial_startup=False):
     now = datetime.now(TIMEZONE)
     day_of_week = now.weekday()
     current_time_obj = now.time()
@@ -114,6 +114,15 @@ def schedule_audio_jobs(initial_startup=False):
         logging.info(f"Scheduled '{call}' to play at {play_time_str} from '{audio_file}'")
 
 def main():
+    global CONFIG, TIMEZONE
+
+    CONFIG = load_config()
+
+    # Setup timezone and logging from config
+    TIMEZONE = pytz.timezone(CONFIG.get('timezone', 'America/Chicago'))
+    log_file = CONFIG.get('log_file', '/var/log/audio_player.log')
+    setup_logging(log_file)
+
     parser = argparse.ArgumentParser(description='Play bugle calls. Can be used to play a specific call or schedule calls.')
     subparsers = parser.add_subparsers(dest='command', help='Commands')
 
@@ -121,7 +130,7 @@ def main():
     play_parser.add_argument('filepath', help='Path to the MP3 file to play.')
     play_parser.add_argument('--volume', type=float, default=1.0, help='Playback volume (0.0 to 1.0). Default is 1.0.')
 
-    subparsers.add_parser('schedule', help='Schedule bugle calls based on YAML.')
+    subparsers.add_parser('schedule', help='Schedule bugle calls based on config.yml.')
 
     args = parser.parse_args()
 
@@ -142,7 +151,9 @@ def main():
     if args.command == 'play':
         play_audio(args.filepath, 'Manual Playback', args.volume)
     elif args.command == 'schedule':
-        schedule_audio_jobs(initial_startup=is_initial_startup)
+        weekday_sched = CONFIG.get('weekdays', {})
+        weekend_sched = CONFIG.get('weekends', {})
+        schedule_audio_jobs(weekday_sched, weekend_sched, initial_startup=is_initial_startup)
         while True:
             schedule.run_pending()
             time.sleep(1)
