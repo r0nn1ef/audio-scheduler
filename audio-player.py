@@ -9,36 +9,39 @@ import argparse
 import os
 import json
 
+# --- Load Configuration ---
 CONFIG_FILE = 'config.yml'
-STATE_FILE = 'play_state.json'
-CONFIG = {}
-TIMEZONE = None
 
 def load_config():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.join(script_dir, CONFIG_FILE)
     try:
         with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
-            return config
-    except FileNotFoundError:
-        print(f"Config file '{config_path}' not found.")
-        raise
-    except yaml.YAMLError as e:
-        print(f"Error parsing config file '{config_path}': {e}")
-        raise
+            return yaml.safe_load(f)
+    except Exception as e:
+        print(f"Error loading config.yml: {e}")
+        exit(1)
 
-def setup_logging(log_file):
-    logging.basicConfig(filename=log_file, level=logging.INFO,
-                        format='%(asctime)s - %(levelname)s - %(message)s')
+config = load_config()
+
+# --- Timezone and Log Setup ---
+TIMEZONE = pytz.timezone(config.get('timezone', 'America/Chicago'))
+LOG_FILE = config.get('log_file', '/var/log/audio_player.log')
+
+logging.basicConfig(filename=LOG_FILE, level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+
+# --- State Management ---
+STATE_FILE = 'play_state.json'
 
 def load_state():
     if os.path.exists(STATE_FILE):
         try:
             with open(STATE_FILE, 'r') as f:
                 state = json.load(f)
-                if state.get('date') != datetime.now(TIMEZONE).strftime('%Y-%m-%d'):
-                    return {"date": datetime.now(TIMEZONE).strftime('%Y-%m-%d'), "played_calls": []}
+                current_date = datetime.now(TIMEZONE).strftime('%Y-%m-%d')
+                if state.get('date') != current_date:
+                    return {"date": current_date, "played_calls": []}
                 return state
         except json.JSONDecodeError:
             logging.warning(f"Error decoding {STATE_FILE}, starting with empty state.")
@@ -51,15 +54,25 @@ def save_state(state):
     except IOError as e:
         logging.error(f"Could not save state to {STATE_FILE}: {e}")
 
+def reset_played_calls():
+    today = datetime.now(TIMEZONE).strftime('%Y-%m-%d')
+    new_state = {"date": today, "played_calls": []}
+    save_state(new_state)
+    logging.info(f"New day detected. Cleared played_calls for {today}.")
+
+# --- Initialize Audio ---
 pygame.mixer.init()
 
 def play_audio(filepath, call_name, volume=1.0):
-    logging.info(f"Attempting to play {call_name} at {datetime.now(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z%z')} with volume {volume}")
+    log_message = f"Attempting to play {call_name} at {datetime.now(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z%z')} with volume {volume}"
+    logging.info(log_message)
+
     state = load_state()
     current_date = datetime.now(TIMEZONE).strftime('%Y-%m-%d')
 
     if state.get('date') != current_date:
         state = {"date": current_date, "played_calls": []}
+        save_state(state)
 
     if call_name in state.get('played_calls', []):
         logging.info(f"'{call_name}' already played today. Skipping.")
@@ -72,15 +85,22 @@ def play_audio(filepath, call_name, volume=1.0):
         while pygame.mixer.music.get_busy():
             time.sleep(0.1)
         logging.info(f"Successfully played {call_name}")
+
         state['played_calls'].append(call_name)
         save_state(state)
+
     except pygame.error as e:
         logging.error(f"Error playing {call_name}: {e}")
         if call_name in state['played_calls']:
             state['played_calls'].remove(call_name)
             save_state(state)
 
-def schedule_audio_jobs(weekday_schedule, weekend_schedule, initial_startup=False):
+# --- Load Schedule from config.yml ---
+def load_schedule():
+    return config.get('weekdays', {}), config.get('weekends', {})
+
+def schedule_audio_jobs(initial_startup=False):
+    weekday_schedule, weekend_schedule = load_schedule()
     now = datetime.now(TIMEZONE)
     day_of_week = now.weekday()
     current_time_obj = now.time()
@@ -88,41 +108,41 @@ def schedule_audio_jobs(weekday_schedule, weekend_schedule, initial_startup=Fals
     schedule.clear()
 
     selected_schedule = weekday_schedule if day_of_week <= 4 else weekend_schedule
-    logging.info("Determined today is a weekday." if day_of_week <= 4 else "Determined today is a weekend day.")
 
     state = load_state()
+    current_date = now.strftime('%Y-%m-%d')
+
+    if state.get('date') != current_date:
+        logging.info(f"New day detected — resetting play_state.json for {current_date}")
+        state = {"date": current_date, "played_calls": []}
+        save_state(state)
 
     for call, details in selected_schedule.items():
         play_time_str = details.get('time')
         audio_file = details.get('audio_file')
 
-        if not play_time_str or not audio_file:
+        if play_time_str and audio_file:
+            try:
+                scheduled_time_obj = dt_time.fromisoformat(play_time_str)
+            except ValueError:
+                logging.warning(f"Invalid time format for '{call}': {play_time_str}. Skipping.")
+                continue
+
+            if initial_startup and current_time_obj > scheduled_time_obj and \
+               call not in state.get('played_calls', []):
+                logging.info(f"Skipping past scheduled '{call}' ({play_time_str}) on initial startup.")
+                continue
+
+            schedule.every().day.at(play_time_str).do(play_audio, audio_file, call)
+            logging.info(f"Scheduled '{call}' to play at {play_time_str} from '{audio_file}'")
+        else:
             logging.warning(f"Skipping '{call}': missing 'time' or 'audio_file'.")
-            continue
 
-        try:
-            scheduled_time_obj = dt_time.fromisoformat(play_time_str)
-        except ValueError:
-            logging.warning(f"Invalid time format for '{call}': {play_time_str}. Skipping.")
-            continue
-
-        if initial_startup and current_time_obj > scheduled_time_obj:
-            logging.info(f"Skipping scheduling '{call}' today ({play_time_str}) as its time already passed on initial startup.")
-            continue
-
-        schedule.every().day.at(play_time_str).do(play_audio, audio_file, call)
-        logging.info(f"Scheduled '{call}' to play at {play_time_str} from '{audio_file}'")
+    # ✅ Schedule daily state reset at 00:01
+    schedule.every().day.at("00:01").do(reset_played_calls)
+    logging.info("Scheduled daily reset of play_state.json at 00:01.")
 
 def main():
-    global CONFIG, TIMEZONE
-
-    CONFIG = load_config()
-
-    # Setup timezone and logging from config
-    TIMEZONE = pytz.timezone(CONFIG.get('timezone', 'America/Chicago'))
-    log_file = CONFIG.get('log_file', '/var/log/audio_player.log')
-    setup_logging(log_file)
-
     parser = argparse.ArgumentParser(description='Play bugle calls. Can be used to play a specific call or schedule calls.')
     subparsers = parser.add_subparsers(dest='command', help='Commands')
 
@@ -130,10 +150,11 @@ def main():
     play_parser.add_argument('filepath', help='Path to the MP3 file to play.')
     play_parser.add_argument('--volume', type=float, default=1.0, help='Playback volume (0.0 to 1.0). Default is 1.0.')
 
-    subparsers.add_parser('schedule', help='Schedule bugle calls based on config.yml.')
+    schedule_parser = subparsers.add_parser('schedule', help='Schedule bugle calls based on YAML.')
 
     args = parser.parse_args()
 
+    # --- Detect if initial startup (boot) ---
     is_initial_startup = False
     uptime_seconds = -1
     try:
@@ -148,12 +169,13 @@ def main():
     elif uptime_seconds == -1:
         logging.warning("Uptime check failed. Assuming not initial startup unless proven otherwise.")
 
+    # ✅ One-time reset at startup
+    reset_played_calls()
+
     if args.command == 'play':
         play_audio(args.filepath, 'Manual Playback', args.volume)
     elif args.command == 'schedule':
-        weekday_sched = CONFIG.get('weekdays', {})
-        weekend_sched = CONFIG.get('weekends', {})
-        schedule_audio_jobs(weekday_sched, weekend_sched, initial_startup=is_initial_startup)
+        schedule_audio_jobs(initial_startup=is_initial_startup)
         while True:
             schedule.run_pending()
             time.sleep(1)
