@@ -24,7 +24,7 @@ def load_config():
 
 config = load_config()
 
-# --- Timezone and Log Setup ---
+# --- Timezone and Logging Setup ---
 TIMEZONE = pytz.timezone(config.get('timezone', 'America/Chicago'))
 LOG_FILE = config.get('log_file', '/var/log/audio_player.log')
 
@@ -60,12 +60,18 @@ def reset_played_calls():
     save_state(new_state)
     logging.info(f"New day detected. Cleared played_calls for {today}.")
 
-# --- Initialize Audio ---
+def daily_reload_schedule():
+    logging.info("Midnight maintenance: resetting state and rescheduling audio jobs.")
+    reset_played_calls()
+    schedule_audio_jobs(initial_startup=False)
+
+# --- Initialize Pygame ---
 pygame.mixer.init()
 
+# --- Audio Playback ---
 def play_audio(filepath, call_name, volume=1.0):
-    log_message = f"Attempting to play {call_name} at {datetime.now(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z%z')} with volume {volume}"
-    logging.info(log_message)
+    now = datetime.now(TIMEZONE).strftime('%Y-%m-%d %H:%M:%S %Z%z')
+    logging.info(f"Attempting to play {call_name} at {now} with volume {volume}")
 
     state = load_state()
     current_date = datetime.now(TIMEZONE).strftime('%Y-%m-%d')
@@ -95,10 +101,11 @@ def play_audio(filepath, call_name, volume=1.0):
             state['played_calls'].remove(call_name)
             save_state(state)
 
-# --- Load Schedule from config.yml ---
+# --- Schedule Loader ---
 def load_schedule():
     return config.get('weekdays', {}), config.get('weekends', {})
 
+# --- Scheduling ---
 def schedule_audio_jobs(initial_startup=False):
     weekday_schedule, weekend_schedule = load_schedule()
     now = datetime.now(TIMEZONE)
@@ -108,7 +115,6 @@ def schedule_audio_jobs(initial_startup=False):
     schedule.clear()
 
     selected_schedule = weekday_schedule if day_of_week <= 4 else weekend_schedule
-
     state = load_state()
     current_date = now.strftime('%Y-%m-%d')
 
@@ -138,10 +144,11 @@ def schedule_audio_jobs(initial_startup=False):
         else:
             logging.warning(f"Skipping '{call}': missing 'time' or 'audio_file'.")
 
-    # ✅ Schedule daily state reset at 00:01
-    schedule.every().day.at("00:01").do(reset_played_calls)
-    logging.info("Scheduled daily reset of play_state.json at 00:01.")
+    # ✅ Schedule daily reload of schedule and state
+    schedule.every().day.at("00:01").do(daily_reload_schedule)
+    logging.info("Scheduled daily reload of schedule and reset of state at 00:01.")
 
+# --- Main CLI and Runtime Loop ---
 def main():
     parser = argparse.ArgumentParser(description='Play bugle calls. Can be used to play a specific call or schedule calls.')
     subparsers = parser.add_subparsers(dest='command', help='Commands')
@@ -154,7 +161,7 @@ def main():
 
     args = parser.parse_args()
 
-    # --- Detect if initial startup (boot) ---
+    # --- Detect if system just booted ---
     is_initial_startup = False
     uptime_seconds = -1
     try:
@@ -169,7 +176,7 @@ def main():
     elif uptime_seconds == -1:
         logging.warning("Uptime check failed. Assuming not initial startup unless proven otherwise.")
 
-    # ✅ One-time reset at startup
+    # ✅ Optional reset at startup for safety
     reset_played_calls()
 
     if args.command == 'play':
